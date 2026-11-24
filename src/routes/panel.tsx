@@ -85,18 +85,18 @@ function StoreForm({ userId, store }: { userId: string; store?: Store }) {
   const [wa, setWa] = useState(store?.whatsapp ?? "");
   const [busy, setBusy] = useState(false);
 
-  async function save(e: React.FormEvent) {
+  async function save(e: React.FormEvent): Promise<void> {
     e.preventDefault();
     const s = slugify(slug || name);
-    if (!s) return toast.error("Escribe un nombre");
-    if (wa.replace(/\D/g, "").length < 9) return toast.error("Escribe un número de WhatsApp válido");
+    if (!s) return void toast.error("Escribe un nombre");
+    if (wa.replace(/\D/g, "").length < 9) return void toast.error("Escribe un número de WhatsApp válido");
     setBusy(true);
     const row = { name, slug: s, description: desc, whatsapp: wa, owner_id: userId };
     const { error } = store
       ? await supabase.from("stores").update(row).eq("id", store.id)
       : await supabase.from("stores").insert(row);
     setBusy(false);
-    if (error) return toast.error(error.code === "23505" ? "Ese enlace ya está en uso, prueba otro" : error.message);
+    if (error) return void toast.error(error.code === "23505" ? "Ese enlace ya está en uso, prueba otro" : error.message);
     toast.success("Tienda guardada");
     qc.invalidateQueries({ queryKey: ["my-store"] });
   }
@@ -142,10 +142,10 @@ function StoreAdmin({ store, userId }: { store: Store; userId: string }) {
     },
   });
 
-  async function remove(id: string) {
+  async function remove(id: string): Promise<void> {
     if (!confirm("¿Eliminar este producto?")) return;
     const { error } = await supabase.from("products").delete().eq("id", id);
-    if (error) return toast.error(error.message);
+    if (error) return void toast.error(error.message);
     productsQ.refetch();
   }
 

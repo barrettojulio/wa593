@@ -66,8 +66,8 @@ export function ProductEditor({
     }
   }
 
-  async function save() {
-    if (!p.name.trim()) return toast.error("Ponle un nombre al producto");
+  async function save(): Promise<void> {
+    if (!p.name.trim()) return void toast.error("Ponle un nombre al producto");
     setBusy(true);
     const options = p.options
       .map((o) => ({ name: o.name.trim(), values: o.values.filter((v) => v.label.trim()) }))
@@ -77,7 +77,7 @@ export function ProductEditor({
       ? await supabase.from("products").update(row).eq("id", p.id)
       : await supabase.from("products").insert(row);
     setBusy(false);
-    if (error) return toast.error(error.message);
+    if (error) return void toast.error(error.message);
     toast.success("Producto guardado");
     onSaved();
     onOpenChange(false);
