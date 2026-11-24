@@ -1,0 +1,20 @@
+{
+  "version": "7",
+  "dialect": "postgresql",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "7",
+      "when": 1795541893941,
+      "tag": "0000_create_stores_products",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1795541915285,
+      "tag": "0001_product_images_read",
+      "breakpoints": true
+    }
+  ]
+}
