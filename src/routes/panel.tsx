@@ -1,20 +1,17 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { ExternalLink, LogOut, Pencil, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { signPaths } from "@/lib/images";
-import { money, slugify, type ProductOption } from "@/lib/order";
+import { money, type ProductOption } from "@/lib/order";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { StoreForm, type Store } from "@/components/shop/StoreForm";
+import { CategoriesManager, useCategories } from "@/components/shop/CategoriesManager";
 import { ProductEditor, emptyProduct, type ProductRow } from "@/components/shop/ProductEditor";
-import { PhoneInput, normalizePhone } from "@/components/shop/PhoneInput";
-import { isValidPhoneNumber } from "libphonenumber-js";
 
 export const Route = createFileRoute("/panel")({
   head: () => ({
@@ -30,7 +27,6 @@ export const Route = createFileRoute("/panel")({
   component: Panel,
 });
 
-type Store = { id: string; slug: string; name: string; description: string; whatsapp: string };
 
 function Panel() {
   const { user, loading } = useAuth();
@@ -79,61 +75,10 @@ function Panel() {
   );
 }
 
-function StoreForm({ userId, store }: { userId: string; store?: Store }) {
-  const qc = useQueryClient();
-  const [name, setName] = useState(store?.name ?? "");
-  const [slug, setSlug] = useState(store?.slug ?? "");
-  const [desc, setDesc] = useState(store?.description ?? "");
-  const [wa, setWa] = useState(normalizePhone(store?.whatsapp ?? ""));
-  const [busy, setBusy] = useState(false);
-
-  async function save(e: React.FormEvent): Promise<void> {
-    e.preventDefault();
-    const s = slugify(slug || name);
-    if (!s) return void toast.error("Escribe un nombre");
-    if (!isValidPhoneNumber(wa)) return void toast.error("Escribe un número de WhatsApp válido");
-    setBusy(true);
-    const row = { name, slug: s, description: desc, whatsapp: wa, owner_id: userId };
-    const { error } = store
-      ? await supabase.from("stores").update(row).eq("id", store.id)
-      : await supabase.from("stores").insert(row);
-    setBusy(false);
-    if (error) return void toast.error(error.code === "23505" ? "Ese enlace ya está en uso, prueba otro" : error.message);
-    toast.success("Tienda guardada");
-    qc.invalidateQueries({ queryKey: ["my-store"] });
-  }
-
-  return (
-    <form onSubmit={save} className="mx-auto max-w-lg space-y-4 rounded-3xl border-2 border-brand-ink bg-card p-7 shadow-pop">
-      <h1 className="text-2xl font-bold">{store ? "Datos de la tienda" : "Crea tu tienda"}</h1>
-      <div className="space-y-1.5">
-        <Label>Nombre de la tienda</Label>
-        <Input required value={name} onChange={(e) => { setName(e.target.value); if (!store) setSlug(slugify(e.target.value)); }} />
-      </div>
-      <div className="space-y-1.5">
-        <Label>Enlace</Label>
-        <div className="flex items-center gap-1 text-sm text-muted-foreground">
-          <span>/t/</span>
-          <Input value={slug} onChange={(e) => setSlug(slugify(e.target.value))} />
-        </div>
-      </div>
-      <div className="space-y-1.5">
-        <Label>WhatsApp donde recibes pedidos</Label>
-        <PhoneInput value={wa} onChange={setWa} />
-      </div>
-      <div className="space-y-1.5">
-        <Label>Descripción</Label>
-        <Textarea value={desc} onChange={(e) => setDesc(e.target.value)} />
-      </div>
-      <Button type="submit" variant="hero" className="w-full" disabled={busy}>
-        {store ? "Guardar cambios" : "Crear tienda"}
-      </Button>
-    </form>
-  );
-}
-
 function StoreAdmin({ store, userId }: { store: Store; userId: string }) {
   const [editing, setEditing] = useState<ProductRow | null>(null);
+  const cats = useCategories(store.id).data ?? [];
+  const catName = (id: string | null) => cats.find((c) => c.id === id)?.name;
   const productsQ = useQuery({
     queryKey: ["my-products", store.id],
     queryFn: async () => {
@@ -156,6 +101,7 @@ function StoreAdmin({ store, userId }: { store: Store; userId: string }) {
     <Tabs defaultValue="productos">
       <TabsList>
         <TabsTrigger value="productos">Productos</TabsTrigger>
+        <TabsTrigger value="categorias">Categorías</TabsTrigger>
         <TabsTrigger value="tienda">Tienda</TabsTrigger>
       </TabsList>
       <TabsContent value="productos" className="mt-6">
@@ -178,7 +124,7 @@ function StoreAdmin({ store, userId }: { store: Store; userId: string }) {
                 <div>
                   <p className="font-semibold">{p.name}</p>
                   <p className="text-sm text-muted-foreground">
-                    {money(Number(p.price))} {!p.active && "· Oculto"}
+                    {money(Number(p.price))} {catName(p.category_id) && `· ${catName(p.category_id)}`} {!p.active && "· Oculto"}
                   </p>
                 </div>
                 <div className="flex">
@@ -202,9 +148,13 @@ function StoreAdmin({ store, userId }: { store: Store; userId: string }) {
             storeId={store.id}
             userId={userId}
             urls={productsQ.data?.urls ?? {}}
+            categories={cats}
             onSaved={() => productsQ.refetch()}
           />
         )}
+      </TabsContent>
+      <TabsContent value="categorias" className="mt-6">
+        <CategoriesManager storeId={store.id} />
       </TabsContent>
       <TabsContent value="tienda" className="mt-6">
         <StoreForm userId={userId} store={store} />

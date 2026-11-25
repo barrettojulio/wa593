@@ -22,8 +22,9 @@ const storeQuery = (slug: string) =>
       if (!store) return null;
       const { data: products, error: e2 } = await supabase.from("products").select("*").eq("store_id", store.id).eq("active", true).order("created_at", { ascending: false });
       if (e2) throw e2;
-      const urls = await signPaths(products.flatMap((p) => p.images));
-      return { store, products, urls };
+      const { data: categories } = await supabase.from("categories").select("id,name,position").eq("store_id", store.id).order("position");
+      const urls = await signPaths([...products.flatMap((p) => p.images), store.logo_url ?? "", store.cover_url ?? ""]);
+      return { store, products, urls, categories: categories ?? [] };
     },
   });
 
@@ -46,12 +47,17 @@ export const Route = createFileRoute("/t/$slug")({
   component: StorePage,
 });
 
-type Product = { id: string; name: string; description: string; price: number; images: string[]; options: unknown };
+type Product = { id: string; name: string; description: string; price: number; images: string[]; options: unknown; category_id: string | null };
 
 function StorePage() {
   const { slug } = Route.useParams();
   const { data } = useSuspenseQuery(storeQuery(slug));
-  const { store, products, urls } = data!;
+  const { store, products, urls, categories } = data!;
+  const [cat, setCat] = useState<string | null>(null);
+  const shown = cat ? products.filter((p) => p.category_id === cat) : products;
+  const usedCats = categories.filter((c) => products.some((p) => p.category_id === c.id));
+  const minOrder = Number(store.min_order) || 0;
+  const socials = ([["Instagram", store.instagram], ["TikTok", store.tiktok], ["Facebook", store.facebook], ["Sitio web", store.website], ["Devoluciones", store.returns_url]] as const).filter(([, u]) => u);
   const cartKey = `cart-${store.id}`;
   const [cart, setCart] = useState<CartItem[]>([]);
   const [ready, setReady] = useState(false);
@@ -74,15 +80,34 @@ function StorePage() {
 
   return (
     <div className="min-h-screen pb-24">
-      <header className="border-b-2 border-brand-ink bg-brand-ink text-brand-ink-foreground">
-        <div className="mx-auto max-w-5xl px-5 py-10">
-          <h1 className="text-4xl font-extrabold md:text-5xl">{store.name}</h1>
-          {store.description && <p className="mt-2 max-w-xl opacity-80">{store.description}</p>}
+      <header className="relative border-b-2 border-brand-ink bg-brand-ink text-brand-ink-foreground">
+        {store.cover_url && urls[store.cover_url] && <img src={urls[store.cover_url]} alt="" className="absolute inset-0 h-full w-full object-cover opacity-40" />}
+        <div className="relative mx-auto flex max-w-5xl items-center gap-5 px-5 py-10">
+          {store.logo_url && urls[store.logo_url] && <img src={urls[store.logo_url]} alt={`Logo de ${store.name}`} className="h-20 w-20 rounded-2xl border-2 border-background object-cover" />}
+          <div>
+            <h1 className="text-4xl font-extrabold md:text-5xl">{store.name}</h1>
+            {store.description && <p className="mt-2 max-w-xl opacity-80">{store.description}</p>}
+            {socials.length > 0 && (
+              <div className="mt-3 flex flex-wrap gap-3 text-sm">
+                {socials.map(([l, u]) => <a key={l} href={u!} target="_blank" rel="noreferrer" className="underline underline-offset-4">{l}</a>)}
+              </div>
+            )}
+          </div>
         </div>
       </header>
+      {usedCats.length > 0 && (
+        <nav className="mx-auto flex max-w-5xl flex-wrap gap-2 px-5 pt-6">
+          {[{ id: null as string | null, name: "Todo" }, ...usedCats].map((c) => (
+            <button key={c.id ?? "all"} type="button" onClick={() => setCat(c.id)}
+              className={`rounded-full border-2 px-4 py-1.5 text-sm font-semibold ${cat === c.id ? "border-brand-ink bg-primary text-primary-foreground" : "border-border bg-card"}`}>
+              {c.name}
+            </button>
+          ))}
+        </nav>
+      )}
       <main className="mx-auto grid max-w-5xl gap-4 px-5 py-8 sm:grid-cols-2 lg:grid-cols-3">
         {products.length === 0 && <p className="text-muted-foreground">Esta tienda aún no tiene productos.</p>}
-        {products.map((p) => (
+        {shown.map((p) => (
           <button key={p.id} type="button" onClick={() => setSelected(p)} className="overflow-hidden rounded-2xl border-2 border-brand-ink bg-card text-left transition hover:shadow-pop-sm">
             <div className="aspect-square bg-muted">{p.images[0] && <img src={urls[p.images[0]]} alt={p.name} className="h-full w-full object-cover" />}</div>
             <div className="p-4">
@@ -100,7 +125,7 @@ function StorePage() {
         </div>
       )}
       {selected && <ProductDialog product={selected} urls={urls} onClose={() => setSelected(null)} onAdd={(i) => { add(i); setSelected(null); }} />}
-      <CartSheet open={cartOpen} onOpenChange={setCartOpen} cart={cart} setCart={setCart} storeName={store.name} whatsapp={store.whatsapp} />
+      <CartSheet open={cartOpen} onOpenChange={setCartOpen} cart={cart} setCart={setCart} storeName={store.name} whatsapp={store.whatsapp} minOrder={minOrder} />
     </div>
   );
 }
@@ -160,7 +185,7 @@ function ProductDialog({ product, urls, onClose, onAdd }: { product: Product; ur
   );
 }
 
-function CartSheet({ open, onOpenChange, cart, setCart, storeName, whatsapp }: { open: boolean; onOpenChange: (o: boolean) => void; cart: CartItem[]; setCart: (c: CartItem[]) => void; storeName: string; whatsapp: string }) {
+function CartSheet({ open, onOpenChange, cart, setCart, storeName, whatsapp, minOrder }: { minOrder: number; open: boolean; onOpenChange: (o: boolean) => void; cart: CartItem[]; setCart: (c: CartItem[]) => void; storeName: string; whatsapp: string }) {
   const [name, setName] = useState("");
   const [address, setAddress] = useState("");
   const [notes, setNotes] = useState("");
@@ -186,7 +211,8 @@ function CartSheet({ open, onOpenChange, cart, setCart, storeName, whatsapp }: {
           <div className="space-y-1.5"><Label>Tu nombre</Label><Input value={name} onChange={(e) => setName(e.target.value)} /></div>
           <div className="space-y-1.5"><Label>Dirección de entrega</Label><Input value={address} onChange={(e) => setAddress(e.target.value)} /></div>
           <div className="space-y-1.5"><Label>Notas</Label><Textarea value={notes} onChange={(e) => setNotes(e.target.value)} /></div>
-          <Button variant="hero" className="w-full" disabled={!name.trim() || cart.length === 0} onClick={send}>Enviar pedido por WhatsApp</Button>
+          {cartTotal(cart) < minOrder && <p className="text-sm text-destructive">El pedido mínimo es {money(minOrder)}.</p>}
+          <Button variant="hero" className="w-full" disabled={!name.trim() || cart.length === 0 || cartTotal(cart) < minOrder} onClick={send}>Enviar pedido por WhatsApp</Button>
         </div>
       </SheetContent>
     </Sheet>

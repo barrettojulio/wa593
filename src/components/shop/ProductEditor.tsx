@@ -19,9 +19,10 @@ export type ProductRow = {
   images: string[];
   options: ProductOption[];
   active: boolean;
+  category_id: string | null;
 };
 
-export const emptyProduct: ProductRow = { name: "", description: "", price: 0, images: [], options: [], active: true };
+export const emptyProduct: ProductRow = { name: "", description: "", price: 0, images: [], options: [], active: true, category_id: null };
 
 export function ProductEditor({
   open,
@@ -30,6 +31,7 @@ export function ProductEditor({
   storeId,
   userId,
   urls,
+  categories = [],
   onSaved,
 }: {
   open: boolean;
@@ -38,6 +40,7 @@ export function ProductEditor({
   storeId: string;
   userId: string;
   urls: Record<string, string>;
+  categories?: { id: string; name: string }[];
   onSaved: () => void;
 }) {
   const [p, setP] = useState<ProductRow>(initial);
@@ -72,7 +75,7 @@ export function ProductEditor({
     const options = p.options
       .map((o) => ({ name: o.name.trim(), values: o.values.filter((v) => v.label.trim()) }))
       .filter((o) => o.name && o.values.length);
-    const row = { name: p.name.trim(), description: p.description, price: Number(p.price) || 0, images: p.images, options, active: p.active, store_id: storeId };
+    const row = { name: p.name.trim(), description: p.description, price: Number(p.price) || 0, images: p.images, options, active: p.active, category_id: p.category_id, store_id: storeId };
     const { error } = p.id
       ? await supabase.from("products").update(row).eq("id", p.id)
       : await supabase.from("products").insert(row);
@@ -116,6 +119,13 @@ export function ProductEditor({
               <Label>Precio base ($)</Label>
               <Input type="number" min={0} step="0.01" value={p.price} onChange={(e) => setP({ ...p, price: Number(e.target.value) })} />
             </div>
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="cat">Categoría</Label>
+            <select id="cat" className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm" value={p.category_id ?? ""} onChange={(e) => setP({ ...p, category_id: e.target.value || null })}>
+              <option value="">Sin categoría</option>
+              {categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+            </select>
           </div>
           <div className="space-y-1.5">
             <Label>Descripción</Label>
