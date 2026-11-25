@@ -16,8 +16,9 @@ const storeQuery = (slug: string) =>
   queryOptions({
     queryKey: ["store", slug],
     queryFn: async () => {
-      const { data: store, error } = await supabase.from("stores").select("*").eq("slug", slug).maybeSingle();
+      const { data: rows, error } = await supabase.rpc("get_store_by_slug", { _slug: slug });
       if (error) throw error;
+      const store = rows?.[0];
       if (!store) return null;
       const { data: products, error: e2 } = await supabase.from("products").select("*").eq("store_id", store.id).eq("active", true).order("created_at", { ascending: false });
       if (e2) throw e2;

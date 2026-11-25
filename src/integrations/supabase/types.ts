@@ -174,6 +174,31 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      get_store_by_slug: {
+        Args: { _slug: string }
+        Returns: {
+          brand_color: string
+          cover_url: string
+          created_at: string
+          currency_code: string
+          currency_symbol: string
+          description: string
+          facebook: string
+          id: string
+          instagram: string
+          logo_url: string
+          min_order: number
+          name: string
+          opening_hours: Json
+          returns_url: string
+          slug: string
+          tiktok: string
+          timezone: string
+          website: string
+          whatsapp: string
+        }[]
+      }
+      is_public_image: { Args: { _path: string }; Returns: boolean }
       owns_store: { Args: { _store: string }; Returns: boolean }
     }
     Enums: {
