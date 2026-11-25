@@ -13,6 +13,8 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ProductEditor, emptyProduct, type ProductRow } from "@/components/shop/ProductEditor";
+import { PhoneInput, normalizePhone } from "@/components/shop/PhoneInput";
+import { isValidPhoneNumber } from "libphonenumber-js";
 
 export const Route = createFileRoute("/panel")({
   head: () => ({
@@ -82,14 +84,14 @@ function StoreForm({ userId, store }: { userId: string; store?: Store }) {
   const [name, setName] = useState(store?.name ?? "");
   const [slug, setSlug] = useState(store?.slug ?? "");
   const [desc, setDesc] = useState(store?.description ?? "");
-  const [wa, setWa] = useState(store?.whatsapp ?? "");
+  const [wa, setWa] = useState(normalizePhone(store?.whatsapp ?? ""));
   const [busy, setBusy] = useState(false);
 
   async function save(e: React.FormEvent): Promise<void> {
     e.preventDefault();
     const s = slugify(slug || name);
     if (!s) return void toast.error("Escribe un nombre");
-    if (wa.replace(/\D/g, "").length < 9) return void toast.error("Escribe un número de WhatsApp válido");
+    if (!isValidPhoneNumber(wa)) return void toast.error("Escribe un número de WhatsApp válido");
     setBusy(true);
     const row = { name, slug: s, description: desc, whatsapp: wa, owner_id: userId };
     const { error } = store
@@ -117,7 +119,7 @@ function StoreForm({ userId, store }: { userId: string; store?: Store }) {
       </div>
       <div className="space-y-1.5">
         <Label>WhatsApp donde recibes pedidos</Label>
-        <Input required placeholder="0991234567" value={wa} onChange={(e) => setWa(e.target.value)} />
+        <PhoneInput value={wa} onChange={setWa} />
       </div>
       <div className="space-y-1.5">
         <Label>Descripción</Label>

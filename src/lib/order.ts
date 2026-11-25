@@ -28,8 +28,9 @@ export function itemKey(productId: string, selections: CartItem["selections"]) {
 
 export function whatsappDigits(phone: string) {
   let d = phone.replace(/\D/g, "");
-  // Ecuador local format 09XXXXXXXX -> 5939XXXXXXXX
+  // Ecuador local: 09XXXXXXXX o 9XXXXXXXX (sin el 0) -> 5939XXXXXXXX
   if (d.length === 10 && d.startsWith("0")) d = "593" + d.slice(1);
+  else if (d.length === 9 && d.startsWith("9")) d = "593" + d;
   return d;
 }
 

@@ -25,4 +25,10 @@ describe("pedido", () => {
   it("convierte número local de Ecuador a formato internacional", () => {
     expect(whatsappDigits("099 123 4567")).toBe("593991234567");
   });
+    it("acepta un número de Ecuador sin el 0 inicial", () => {
+    expect(whatsappDigits("991234567")).toBe("593991234567");
+  });
+  it("deja intacto un número ya internacional", () => {
+    expect(whatsappDigits("+593 99 123 4567")).toBe("593991234567");
+  });
 });
