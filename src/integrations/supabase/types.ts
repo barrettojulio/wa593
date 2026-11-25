@@ -14,9 +14,42 @@ export type Database = {
   }
   public: {
     Tables: {
+      categories: {
+        Row: {
+          created_at: string
+          id: string
+          name: string
+          position: number
+          store_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          name: string
+          position?: number
+          store_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          name?: string
+          position?: number
+          store_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "categories_store_id_fkey"
+            columns: ["store_id"]
+            isOneToOne: false
+            referencedRelation: "stores"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       products: {
         Row: {
           active: boolean
+          category_id: string | null
           created_at: string
           description: string
           id: string
@@ -28,6 +61,7 @@ export type Database = {
         }
         Insert: {
           active?: boolean
+          category_id?: string | null
           created_at?: string
           description?: string
           id?: string
@@ -39,6 +73,7 @@ export type Database = {
         }
         Update: {
           active?: boolean
+          category_id?: string | null
           created_at?: string
           description?: string
           id?: string
@@ -50,6 +85,13 @@ export type Database = {
         }
         Relationships: [
           {
+            foreignKeyName: "products_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "categories"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "products_store_id_fkey"
             columns: ["store_id"]
             isOneToOne: false
@@ -60,33 +102,69 @@ export type Database = {
       }
       stores: {
         Row: {
+          brand_color: string | null
+          cover_url: string | null
           created_at: string
+          currency_code: string
+          currency_symbol: string
           description: string
+          facebook: string | null
           id: string
+          instagram: string | null
           logo_url: string | null
+          min_order: number
           name: string
+          opening_hours: Json
           owner_id: string
+          returns_url: string | null
           slug: string
+          tiktok: string | null
+          timezone: string
+          website: string | null
           whatsapp: string
         }
         Insert: {
+          brand_color?: string | null
+          cover_url?: string | null
           created_at?: string
+          currency_code?: string
+          currency_symbol?: string
           description?: string
+          facebook?: string | null
           id?: string
+          instagram?: string | null
           logo_url?: string | null
+          min_order?: number
           name: string
+          opening_hours?: Json
           owner_id: string
+          returns_url?: string | null
           slug: string
+          tiktok?: string | null
+          timezone?: string
+          website?: string | null
           whatsapp?: string
         }
         Update: {
+          brand_color?: string | null
+          cover_url?: string | null
           created_at?: string
+          currency_code?: string
+          currency_symbol?: string
           description?: string
+          facebook?: string | null
           id?: string
+          instagram?: string | null
           logo_url?: string | null
+          min_order?: number
           name?: string
+          opening_hours?: Json
           owner_id?: string
+          returns_url?: string | null
           slug?: string
+          tiktok?: string | null
+          timezone?: string
+          website?: string | null
           whatsapp?: string
         }
         Relationships: []
