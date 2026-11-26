@@ -28,3 +28,6 @@ use the editor.
   own key and store it in Secrets.
 - **Secrets.** Lovable manages them. Do not put secret values in the repo.
 <!-- LOVABLE:END -->
+
+- Keep store settings and category management in dedicated shop components consumed by the panel; this keeps editing concerns separate from public storefront rendering.
+- Public storefronts use the slug lookup RPC rather than reading stores directly; this preserves owner-only access to full store records.

@@ -39,7 +39,8 @@ function Panel() {
     queryKey: ["my-store", user?.id],
     enabled: !!user,
     queryFn: async () => {
-      const { data, error } = await supabase.from("stores").select("*").eq("owner_id", user!.id).maybeSingle();
+      if (!user) return null;
+      const { data, error } = await supabase.from("stores").select("*").eq("owner_id", user.id).maybeSingle();
       if (error) throw error;
       return data as Store | null;
     },

@@ -33,6 +33,7 @@ export function StoreForm({ userId, store }: { userId: string; store?: Store }) 
     instagram: store?.instagram ?? "", tiktok: store?.tiktok ?? "", facebook: store?.facebook ?? "",
     website: store?.website ?? "", returns_url: store?.returns_url ?? "",
   });
+  const [hoursChanged, setHoursChanged] = useState(false);
   const [hours, setHours] = useState<Record<string, DayHours>>(() => {
     const h = (store?.opening_hours ?? {}) as Record<string, DayHours>;
     return Object.fromEntries(DAYS.map(([k]) => [k, h[k] ?? defaultDay]));
@@ -63,7 +64,7 @@ export function StoreForm({ userId, store }: { userId: string; store?: Store }) 
     setBusy(true);
     const opt = (v: string) => v.trim() || null;
     const row = {
-      ...f, slug: s, owner_id: userId, opening_hours: hours, min_order: Number(f.min_order) || 0,
+      ...f, slug: s, owner_id: userId, opening_hours: hoursChanged ? hours : store?.opening_hours ?? {}, min_order: Number(f.min_order) || 0,
       instagram: opt(f.instagram), tiktok: opt(f.tiktok), facebook: opt(f.facebook), website: opt(f.website), returns_url: opt(f.returns_url),
     };
     const { error } = store ? await supabase.from("stores").update(row).eq("id", store.id) : await supabase.from("stores").insert(row);
@@ -116,9 +117,10 @@ export function StoreForm({ userId, store }: { userId: string; store?: Store }) 
 
       <section className="space-y-3">
         <h2 className="text-lg font-bold">Horario de atención</h2>
+        <div className="space-y-1.5"><Label htmlFor="timezone">Zona horaria</Label><Input id="timezone" required value={f.timezone} onChange={(e) => set("timezone", e.target.value)} /></div>
         {DAYS.map(([k, label]) => {
-          const d = hours[k]!;
-          const upd = (p: Partial<DayHours>) => setHours({ ...hours, [k]: { ...d, ...p } });
+          const d = hours[k] ?? defaultDay;
+          const upd = (p: Partial<DayHours>) => { setHoursChanged(true); setHours({ ...hours, [k]: { ...d, ...p } }); };
           return (
             <div key={k} className="flex flex-wrap items-center gap-3">
               <span className="w-24 text-sm font-medium">{label}</span>

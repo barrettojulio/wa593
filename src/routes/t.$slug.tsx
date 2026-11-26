@@ -52,13 +52,12 @@ type Product = { id: string; name: string; description: string; price: number; i
 function StorePage() {
   const { slug } = Route.useParams();
   const { data } = useSuspenseQuery(storeQuery(slug));
-  const { store, products, urls, categories } = data!;
+  const { store, products, urls, categories } = data ?? { store: null, products: [], urls: {}, categories: [] };
   const [cat, setCat] = useState<string | null>(null);
   const shown = cat ? products.filter((p) => p.category_id === cat) : products;
   const usedCats = categories.filter((c) => products.some((p) => p.category_id === c.id));
-  const minOrder = Number(store.min_order) || 0;
-  const socials = ([["Instagram", store.instagram], ["TikTok", store.tiktok], ["Facebook", store.facebook], ["Sitio web", store.website], ["Devoluciones", store.returns_url]] as const).filter(([, u]) => u);
-  const cartKey = `cart-${store.id}`;
+  const socials = ([["Instagram", store?.instagram], ["TikTok", store?.tiktok], ["Facebook", store?.facebook], ["Sitio web", store?.website], ["Devoluciones", store?.returns_url]] as const).filter(([, u]) => u && /^https?:\/\//i.test(u));
+  const cartKey = `cart-${store?.id ?? slug}`;
   const [cart, setCart] = useState<CartItem[]>([]);
   const [ready, setReady] = useState(false);
   const [selected, setSelected] = useState<Product | null>(null);
@@ -77,6 +76,7 @@ function StorePage() {
     });
   }
   const count = cart.reduce((s, i) => s + i.quantity, 0);
+  if (!store) return null;
 
   return (
     <div className="min-h-screen pb-24">
@@ -89,7 +89,7 @@ function StorePage() {
             {store.description && <p className="mt-2 max-w-xl opacity-80">{store.description}</p>}
             {socials.length > 0 && (
               <div className="mt-3 flex flex-wrap gap-3 text-sm">
-                {socials.map(([l, u]) => <a key={l} href={u!} target="_blank" rel="noreferrer" className="underline underline-offset-4">{l}</a>)}
+                {socials.map(([l, u]) => <a key={l} href={u ?? undefined} target="_blank" rel="noreferrer" className="underline underline-offset-4">{l}</a>)}
               </div>
             )}
           </div>
@@ -98,10 +98,9 @@ function StorePage() {
       {usedCats.length > 0 && (
         <nav className="mx-auto flex max-w-5xl flex-wrap gap-2 px-5 pt-6">
           {[{ id: null as string | null, name: "Todo" }, ...usedCats].map((c) => (
-            <button key={c.id ?? "all"} type="button" onClick={() => setCat(c.id)}
-              className={`rounded-full border-2 px-4 py-1.5 text-sm font-semibold ${cat === c.id ? "border-brand-ink bg-primary text-primary-foreground" : "border-border bg-card"}`}>
+            <Button key={c.id ?? "all"} type="button" variant={cat === c.id ? "default" : "outline"} onClick={() => setCat(c.id)}>
               {c.name}
-            </button>
+            </Button>
           ))}
         </nav>
       )}
@@ -125,7 +124,7 @@ function StorePage() {
         </div>
       )}
       {selected && <ProductDialog product={selected} urls={urls} onClose={() => setSelected(null)} onAdd={(i) => { add(i); setSelected(null); }} />}
-      <CartSheet open={cartOpen} onOpenChange={setCartOpen} cart={cart} setCart={setCart} storeName={store.name} whatsapp={store.whatsapp} minOrder={minOrder} />
+      <CartSheet open={cartOpen} onOpenChange={setCartOpen} cart={cart} setCart={setCart} storeName={store.name} whatsapp={store.whatsapp} />
     </div>
   );
 }
@@ -185,7 +184,7 @@ function ProductDialog({ product, urls, onClose, onAdd }: { product: Product; ur
   );
 }
 
-function CartSheet({ open, onOpenChange, cart, setCart, storeName, whatsapp, minOrder }: { minOrder: number; open: boolean; onOpenChange: (o: boolean) => void; cart: CartItem[]; setCart: (c: CartItem[]) => void; storeName: string; whatsapp: string }) {
+function CartSheet({ open, onOpenChange, cart, setCart, storeName, whatsapp }: { open: boolean; onOpenChange: (o: boolean) => void; cart: CartItem[]; setCart: (c: CartItem[]) => void; storeName: string; whatsapp: string }) {
   const [name, setName] = useState("");
   const [address, setAddress] = useState("");
   const [notes, setNotes] = useState("");
@@ -211,8 +210,7 @@ function CartSheet({ open, onOpenChange, cart, setCart, storeName, whatsapp, min
           <div className="space-y-1.5"><Label>Tu nombre</Label><Input value={name} onChange={(e) => setName(e.target.value)} /></div>
           <div className="space-y-1.5"><Label>Dirección de entrega</Label><Input value={address} onChange={(e) => setAddress(e.target.value)} /></div>
           <div className="space-y-1.5"><Label>Notas</Label><Textarea value={notes} onChange={(e) => setNotes(e.target.value)} /></div>
-          {cartTotal(cart) < minOrder && <p className="text-sm text-destructive">El pedido mínimo es {money(minOrder)}.</p>}
-          <Button variant="hero" className="w-full" disabled={!name.trim() || cart.length === 0 || cartTotal(cart) < minOrder} onClick={send}>Enviar pedido por WhatsApp</Button>
+          <Button variant="hero" className="w-full" disabled={!name.trim() || cart.length === 0} onClick={send}>Enviar pedido por WhatsApp</Button>
         </div>
       </SheetContent>
     </Sheet>
