@@ -1,6 +1,6 @@
 import { createFileRoute, notFound } from "@tanstack/react-router";
 import { queryOptions, useSuspenseQuery } from "@tanstack/react-query";
-import { createContext, useContext, useEffect, useRef, useState } from "react";
+import { createContext, useContext, useEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { ChevronLeft, MessageCircle, Minus, Package, Plus, RotateCcw, ShoppingBag, Trash2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { signPaths } from "@/lib/images";
@@ -59,6 +59,40 @@ export const Route = createFileRoute("/t/$slug")({
 
 // Símbolo de moneda de la tienda (se configura en el panel). Lo leen el producto y el carrito.
 const CurrencyContext = createContext("$");
+
+const HEX_COLOR = /^#[0-9a-f]{6}$/i;
+
+// El color de marca reemplaza el color principal del tema: botones, precios, filtros y carrito.
+function brandVars(hex: string): Record<string, string> {
+  return {
+    "--primary": hex,
+    "--primary-foreground": readableOn(hex),
+    "--ring": hex,
+    "--accent": `color-mix(in srgb, ${hex} 18%, white)`,
+  };
+}
+
+// Aplica moneda y color de marca a toda la tienda (lista, producto y carrito).
+function StoreProviders({ symbol, brand, children }: { symbol: string; brand: string | null; children: ReactNode }) {
+  const valid = !!brand && HEX_COLOR.test(brand);
+  // El carrito se abre en una capa fuera de la página, por eso el color también se pone en el documento.
+  useEffect(() => {
+    if (!valid || !brand) return;
+    const vars = brandVars(brand);
+    const root = document.documentElement;
+    Object.entries(vars).forEach(([k, v]) => root.style.setProperty(k, v));
+    return () => {
+      Object.keys(vars).forEach((k) => root.style.removeProperty(k));
+    };
+  }, [valid, brand]);
+  return (
+    <CurrencyContext.Provider value={symbol}>
+      <div className="contents" style={valid && brand ? (brandVars(brand) as CSSProperties) : undefined}>
+        {children}
+      </div>
+    </CurrencyContext.Provider>
+  );
+}
 
 // Campos opcionales: se muestran solo si existen en la base de datos y el producto los tiene.
 type Detail = { title: string; body: string };
@@ -189,7 +223,7 @@ function StorePage() {
 
   if (selected) {
     return (
-      <CurrencyContext.Provider value={symbol}>
+      <StoreProviders symbol={symbol} brand={store.brand_color}>
         <ProductView
           key={selected.id}
           product={selected}
@@ -202,7 +236,6 @@ function StorePage() {
             whatsapp: store.whatsapp,
             minOrder,
             returnsUrl: isHttpUrl(store.returns_url) ? store.returns_url : null,
-            brand: store.brand_color || "#111111",
           }}
           cartCount={count}
           onBack={closeProduct}
@@ -210,12 +243,12 @@ function StorePage() {
           onAdd={(items) => { items.forEach(add); setCartOpen(true); }}
         />
         <CartSheet open={cartOpen} onOpenChange={setCartOpen} cart={cart} setCart={setCart} storeName={store.name} whatsapp={store.whatsapp} minOrder={minOrder} />
-      </CurrencyContext.Provider>
+      </StoreProviders>
     );
   }
 
   return (
-    <CurrencyContext.Provider value={symbol}>
+    <StoreProviders symbol={symbol} brand={store.brand_color}>
     <div className="min-h-screen pb-24">
       <header className="relative border-b-2 border-brand-ink bg-brand-ink text-brand-ink-foreground">
         {store.cover_url && urls[store.cover_url] && <img src={urls[store.cover_url]} alt="" className="absolute inset-0 h-full w-full object-cover opacity-40" />}
@@ -270,11 +303,11 @@ function StorePage() {
       <WhatsAppFab whatsapp={store.whatsapp} text={`Hola, vi tu tienda ${store.name} y tengo una pregunta.`} />
       <CartSheet open={cartOpen} onOpenChange={setCartOpen} cart={cart} setCart={setCart} storeName={store.name} whatsapp={store.whatsapp} minOrder={minOrder} />
     </div>
-    </CurrencyContext.Provider>
+    </StoreProviders>
   );
 }
 
-type StoreInfo = { name: string; logo?: string | undefined; whatsapp: string; minOrder: number; returnsUrl: string | null; brand: string };
+type StoreInfo = { name: string; logo?: string | undefined; whatsapp: string; minOrder: number; returnsUrl: string | null };
 
 function ProductView({
   product, products, categories, urls, store, cartCount, onBack, onOpenCart, onAdd,
@@ -305,7 +338,6 @@ function ProductView({
   const discount = before > 0 ? Math.round((1 - unit / before) * 100) : 0;
   const details = parseDetails(product.details);
   const category = categories.find((c) => c.id === product.category_id);
-  const onBrand = readableOn(store.brand);
 
   // "Extra": sugiere otro producto de la tienda (primero de la misma categoría).
   const others = products.filter((p) => p.id !== product.id);
@@ -337,7 +369,7 @@ function ProductView({
           <button type="button" onClick={onOpenCart} aria-label="Ver carrito" className="relative p-1">
             <ShoppingBag className="h-6 w-6" />
             {cartCount > 0 && (
-              <span className="absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full px-1 text-xs font-bold" style={{ backgroundColor: store.brand, color: onBrand }}>
+              <span className="absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-primary px-1 text-xs font-bold text-primary-foreground">
                 {cartCount}
               </span>
             )}
@@ -379,7 +411,7 @@ function ProductView({
               {before > 0 && (
                 <>
                   <span className="text-sm text-muted-foreground">Antes: <span className="line-through">{fmt(before)}</span></span>
-                  {discount > 0 && <span className="rounded-full px-2 py-0.5 text-xs font-bold" style={{ backgroundColor: store.brand, color: onBrand }}>-{discount}%</span>}
+                  {discount > 0 && <span className="rounded-full bg-primary px-2 py-0.5 text-xs font-bold text-primary-foreground">-{discount}%</span>}
                 </>
               )}
             </div>
@@ -403,8 +435,7 @@ function ProductView({
                         </button>
                       ) : (
                         <button key={v.label} type="button" onClick={() => setPicks({ ...picks, [o.name]: i })}
-                          className={`min-h-10 min-w-11 rounded-md border px-3 text-sm font-medium ${active ? "border-transparent" : "border-border bg-card hover:border-foreground"}`}
-                          style={active ? { backgroundColor: store.brand, color: onBrand } : undefined}>
+                          className={`min-h-10 min-w-11 rounded-md border px-3 text-sm font-medium ${active ? "border-transparent bg-primary text-primary-foreground" : "border-border bg-card hover:border-foreground"}`}>
                           {v.label}
                         </button>
                       );
@@ -462,7 +493,7 @@ function ProductView({
             <span className="w-6 text-center font-semibold">{qty}</span>
             <button type="button" aria-label="Más" onClick={() => setQty(qty + 1)} className="p-3"><Plus className="h-4 w-4" /></button>
           </div>
-          <button type="button" onClick={addToCart} className="h-12 flex-1 rounded-full text-base font-bold" style={{ backgroundColor: store.brand, color: onBrand }}>
+          <button type="button" onClick={addToCart} className="h-12 flex-1 rounded-full bg-primary text-base font-bold text-primary-foreground">
             Agregar al carrito · {fmt(unit * qty + (withExtra ? extraPrice : 0))}
           </button>
         </div>
