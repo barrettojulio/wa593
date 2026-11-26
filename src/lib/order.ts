@@ -1,5 +1,7 @@
-export type OptionValue = { label: string; price: number };
-export type ProductOption = { name: string; values: OptionValue[] };
+// Cómo se muestra una opción al cliente: botones, lista desplegable, bolitas de selección, o color/imagen.
+export type OptionType = "buttons" | "list" | "radio" | "color";
+export type OptionValue = { label: string; price: number; color?: string; image?: string };
+export type ProductOption = { name: string; type?: OptionType; values: OptionValue[] };
 
 export type CartItem = {
   key: string;
@@ -18,8 +20,10 @@ export function cartTotal(items: CartItem[]) {
   return items.reduce((s, i) => s + unitPrice(i) * i.quantity, 0);
 }
 
-export function money(n: number) {
-  return `$${n.toFixed(2)}`;
+export function money(n: number, symbol = "$") {
+  const s = symbol.trim() || "$";
+  // Símbolos largos como "S/" o "COP" llevan un espacio: "S/ 12.00"
+  return `${s}${s.length > 1 ? " " : ""}${n.toFixed(2)}`;
 }
 
 export function itemKey(productId: string, selections: CartItem["selections"]) {
@@ -38,13 +42,14 @@ export function buildOrderMessage(
   storeName: string,
   items: CartItem[],
   customer: { name: string; address?: string; notes?: string },
+  symbol = "$",
 ) {
   const lines = [`*Nuevo pedido — ${storeName}*`, ""];
   items.forEach((i, idx) => {
-    lines.push(`${idx + 1}. ${i.name} x${i.quantity} — ${money(unitPrice(i) * i.quantity)}`);
+    lines.push(`${idx + 1}. ${i.name} x${i.quantity} — ${money(unitPrice(i) * i.quantity, symbol)}`);
     i.selections.forEach((s) => lines.push(`   • ${s.option}: ${s.value}`));
   });
-  lines.push("", `*Total: ${money(cartTotal(items))}*`, "", `Cliente: ${customer.name}`);
+  lines.push("", `*Total: ${money(cartTotal(items), symbol)}*`, "", `Cliente: ${customer.name}`);
   if (customer.address) lines.push(`Dirección: ${customer.address}`);
   if (customer.notes) lines.push(`Notas: ${customer.notes}`);
   return lines.join("\n");

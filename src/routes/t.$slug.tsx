@@ -1,7 +1,7 @@
 import { createFileRoute, notFound } from "@tanstack/react-router";
 import { queryOptions, useSuspenseQuery } from "@tanstack/react-query";
 import { createContext, useContext, useEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
-import { ChevronLeft, MessageCircle, Minus, Package, Plus, RotateCcw, ShoppingBag, Trash2 } from "lucide-react";
+import { Check, ChevronLeft, Home, MessageCircle, Minus, Package, Plus, RotateCcw, Search, ShoppingBag, Trash2, type LucideIcon } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { signPaths } from "@/lib/images";
 import {
@@ -20,6 +20,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import { OptionPicker } from "@/components/shop/OptionPicker";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 
 const storeQuery = (slug: string) =>
@@ -120,21 +121,9 @@ function parseDetails(v: unknown): Detail[] {
   });
 }
 
-const COLOR_MAP: Record<string, string> = {
-  negro: "#111111", blanco: "#ffffff", gris: "#9ca3af", rojo: "#dc2626", azul: "#2563eb",
-  "azul marino": "#1e3a8a", verde: "#16a34a", amarillo: "#facc15", naranja: "#f97316",
-  rosado: "#f472b6", rosa: "#f472b6", morado: "#7c3aed", lila: "#c4b5fd", café: "#7c4a2d",
-  cafe: "#7c4a2d", beige: "#d6c3a1", celeste: "#38bdf8", turquesa: "#14b8a6", vino: "#7f1d1d",
-  dorado: "#d4af37", plateado: "#c0c0c0",
-};
-
 // Los enlaces los escribe el vendedor: solo se aceptan http(s) para evitar enlaces peligrosos (javascript:).
 function isHttpUrl(u: string | null | undefined): u is string {
   return !!u && /^https?:\/\//i.test(u);
-}
-
-function swatchColor(label: string) {
-  return COLOR_MAP[label.trim().toLowerCase()];
 }
 
 function readableOn(hex: string) {
@@ -161,6 +150,22 @@ function WhatsAppFab({ whatsapp, text, className }: { whatsapp: string; text: st
   );
 }
 
+const tabClass = "relative flex flex-col items-center gap-0.5 py-2 text-[11px] font-medium text-muted-foreground active:text-foreground";
+
+function TabButton({ icon: Icon, label, badge = 0, onClick }: { icon: LucideIcon; label: string; badge?: number; onClick: () => void }) {
+  return (
+    <button type="button" onClick={onClick} className={tabClass}>
+      <span className="relative">
+        <Icon className="h-6 w-6" />
+        {badge > 0 && (
+          <span className="absolute -right-2.5 -top-1.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1 text-[10px] font-bold text-primary-foreground">{badge}</span>
+        )}
+      </span>
+      {label}
+    </button>
+  );
+}
+
 function StorePage() {
   const { slug } = Route.useParams();
   const { data } = useSuspenseQuery(storeQuery(slug));
@@ -168,7 +173,11 @@ function StorePage() {
   const symbol = store?.currency_symbol || "$";
   const fmt = (n: number) => money(n, symbol);
   const [cat, setCat] = useState<string | null>(null);
-  const shown = cat ? products.filter((p) => p.category_id === cat) : products;
+  const [query, setQuery] = useState("");
+  const [flash, setFlash] = useState<string | null>(null);
+  const searchRef = useRef<HTMLInputElement>(null);
+  const q = query.trim().toLowerCase();
+  const shown = products.filter((p) => (!cat || p.category_id === cat) && (!q || p.name.toLowerCase().includes(q)));
   const usedCats = categories.filter((c) => products.some((p) => p.category_id === c.id));
   const minOrder = Number(store?.min_order) || 0;
   const socials = ([["Instagram", store?.instagram], ["TikTok", store?.tiktok], ["Facebook", store?.facebook], ["Sitio web", store?.website], ["Devoluciones", store?.returns_url]] as const).filter(([, u]) => u && isHttpUrl(u));
@@ -217,6 +226,11 @@ function StorePage() {
       return ex ? c.map((x) => (x.key === item.key ? { ...x, quantity: x.quantity + item.quantity } : x)) : [...c, item];
     });
   }
+  function quickAdd(p: Product) {
+    add({ key: itemKey(p.id, []), productId: p.id, name: p.name, basePrice: Number(p.price), selections: [], quantity: 1 });
+    setFlash(p.id);
+    setTimeout(() => setFlash((f) => (f === p.id ? null : f)), 1200);
+  }
   const count = cart.reduce((s, i) => s + i.quantity, 0);
   if (!store) return null;
   const selected: Product | null = selectedId ? (products.find((p) => p.id === selectedId) ?? null) : null;
@@ -247,62 +261,114 @@ function StorePage() {
     );
   }
 
+  const goHome = () => {
+    setQuery("");
+    setCat(null);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+  const goSearch = () => {
+    window.scrollTo({ top: 0, behavior: "smooth" });
+    searchRef.current?.focus();
+  };
+
   return (
     <StoreProviders symbol={symbol} brand={store.brand_color}>
-    <div className="min-h-screen pb-24">
-      <header className="relative border-b-2 border-brand-ink bg-brand-ink text-brand-ink-foreground">
-        {store.cover_url && urls[store.cover_url] && <img src={urls[store.cover_url]} alt="" className="absolute inset-0 h-full w-full object-cover opacity-40" />}
-        <div className="relative mx-auto flex max-w-5xl items-center gap-5 px-5 py-10">
-          {store.logo_url && urls[store.logo_url] && <img src={urls[store.logo_url]} alt={`Logo de ${store.name}`} className="h-20 w-20 rounded-2xl border-2 border-background object-cover" />}
-          <div>
-            <h1 className="text-4xl font-extrabold md:text-5xl">{store.name}</h1>
-            {store.description && <p className="mt-2 max-w-xl opacity-80">{store.description}</p>}
-            {socials.length > 0 && (
-              <div className="mt-3 flex flex-wrap gap-3 text-sm">
-                {socials.map(([l, u]) => <a key={l} href={u ?? undefined} target="_blank" rel="noreferrer" className="underline underline-offset-4">{l}</a>)}
+      <div className="min-h-screen bg-background pb-24 md:pb-10">
+        <header className="relative border-b bg-brand-ink text-brand-ink-foreground">
+          {store.cover_url && urls[store.cover_url] && <img src={urls[store.cover_url]} alt="" className="absolute inset-0 h-full w-full object-cover opacity-40" />}
+          <div className="relative mx-auto flex max-w-5xl items-center gap-4 px-4 py-6 md:gap-5 md:px-5 md:py-10">
+            {store.logo_url && urls[store.logo_url] && <img src={urls[store.logo_url]} alt={`Logo de ${store.name}`} className="h-16 w-16 rounded-2xl border-2 border-background object-cover md:h-20 md:w-20" />}
+            <div>
+              <h1 className="text-2xl font-extrabold md:text-5xl">{store.name}</h1>
+              {store.description && <p className="mt-1 max-w-xl text-sm opacity-80 md:mt-2 md:text-base">{store.description}</p>}
+              {socials.length > 0 && (
+                <div className="mt-2 flex flex-wrap gap-3 text-sm md:mt-3">
+                  {socials.map(([l, u]) => <a key={l} href={u ?? undefined} target="_blank" rel="noreferrer" className="underline underline-offset-4">{l}</a>)}
+                </div>
+              )}
+            </div>
+          </div>
+        </header>
+
+        {/* Búsqueda y categorías: se quedan fijas al bajar */}
+        <div className="sticky top-0 z-30 border-b bg-background/95 backdrop-blur">
+          <div className="mx-auto max-w-5xl space-y-2 px-4 py-2.5">
+            <div className="flex items-center gap-2">
+              <div className="relative flex-1">
+                <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                <Input ref={searchRef} type="search" inputMode="search" placeholder="Buscar productos" aria-label="Buscar productos" value={query} onChange={(e) => setQuery(e.target.value)} className="h-10 rounded-full pl-9" />
               </div>
+              <button type="button" aria-label="Ver carrito" onClick={() => setCartOpen(true)} className="relative hidden p-2 md:block">
+                <ShoppingBag className="h-6 w-6" />
+                {count > 0 && (
+                  <span className="absolute -right-0.5 -top-0.5 flex h-5 min-w-5 items-center justify-center rounded-full bg-primary px-1 text-xs font-bold text-primary-foreground">{count}</span>
+                )}
+              </button>
+            </div>
+            {usedCats.length > 0 && (
+              <nav aria-label="Categorías" className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-0.5 [scrollbar-width:none]">
+                {[{ id: null as string | null, name: "Todo" }, ...usedCats].map((c) => (
+                  <button key={c.id ?? "all"} type="button" aria-pressed={cat === c.id} onClick={() => setCat(c.id)}
+                    className={`shrink-0 rounded-full border px-4 py-1.5 text-sm font-semibold ${cat === c.id ? "border-transparent bg-primary text-primary-foreground" : "border-border bg-card"}`}>
+                    {c.name}
+                  </button>
+                ))}
+              </nav>
             )}
           </div>
         </div>
-      </header>
-      {usedCats.length > 0 && (
-        <nav className="mx-auto flex max-w-5xl flex-wrap gap-2 px-5 pt-6">
-          {[{ id: null as string | null, name: "Todo" }, ...usedCats].map((c) => (
-            <Button key={c.id ?? "all"} type="button" variant={cat === c.id ? "default" : "outline"} onClick={() => setCat(c.id)}>
-              {c.name}
-            </Button>
-          ))}
-        </nav>
-      )}
-      <main className="mx-auto grid max-w-5xl gap-4 px-5 py-8 sm:grid-cols-2 lg:grid-cols-3">
-        {products.length === 0 && <p className="text-muted-foreground">Esta tienda aún no tiene productos.</p>}
-        {shown.map((p) => {
-          const pr: Product = p;
-          const compare = Number(pr.compare_at_price) || 0;
-          return (
-            <button key={p.id} type="button" onClick={() => openProduct(p.id)} className="overflow-hidden rounded-2xl border-2 border-brand-ink bg-card text-left transition hover:shadow-pop-sm">
-              <div className="aspect-square bg-muted">{p.images[0] && <img src={urls[p.images[0]]} alt={p.name} className="h-full w-full object-cover" />}</div>
-              <div className="p-4">
-                <p className="font-semibold">{p.name}</p>
-                <p className="font-display text-lg font-bold text-primary">
-                  {fmt(Number(p.price))}
-                  {compare > Number(p.price) && <span className="ml-2 text-sm font-normal text-muted-foreground line-through">{fmt(compare)}</span>}
-                </p>
+
+        <main className="mx-auto grid max-w-5xl grid-cols-2 gap-3 px-4 py-5 sm:grid-cols-3 md:gap-4 lg:grid-cols-4">
+          {products.length === 0 && <p className="col-span-full text-muted-foreground">Esta tienda aún no tiene productos.</p>}
+          {products.length > 0 && shown.length === 0 && (
+            <div className="col-span-full py-12 text-center text-muted-foreground">
+              <p>No encontramos productos{query.trim() ? ` para "${query.trim()}"` : " en esta categoría"}.</p>
+              <Button variant="link" onClick={goHome}>Ver todos los productos</Button>
+            </div>
+          )}
+          {shown.map((p) => {
+            const pr: Product = p;
+            const compare = Number(pr.compare_at_price) || 0;
+            const simple = Array.isArray(p.options) && p.options.length === 0;
+            return (
+              <div key={p.id} className="relative overflow-hidden rounded-2xl border bg-card">
+                <button type="button" onClick={() => openProduct(p.id)} className="block w-full text-left">
+                  <div className="aspect-square bg-muted">{p.images[0] && <img src={urls[p.images[0]]} alt={p.name} loading="lazy" className="h-full w-full object-cover" />}</div>
+                  <div className="p-3">
+                    <p className="line-clamp-2 min-h-10 text-sm font-semibold leading-5">{p.name}</p>
+                    <p className="mt-1 font-display text-base font-bold text-primary">
+                      {fmt(Number(p.price))}
+                      {compare > Number(p.price) && <span className="ml-2 text-xs font-normal text-muted-foreground line-through">{fmt(compare)}</span>}
+                    </p>
+                  </div>
+                </button>
+                {simple && (
+                  <button type="button" aria-label={`Agregar ${p.name} al carrito`} onClick={() => quickAdd(pr)}
+                    className="absolute right-2 top-2 flex h-9 w-9 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-md active:scale-95">
+                    {flash === p.id ? <Check className="h-5 w-5" /> : <Plus className="h-5 w-5" />}
+                  </button>
+                )}
               </div>
-            </button>
-          );
-        })}
-      </main>
-      {count > 0 && (
-        <div className="fixed inset-x-0 bottom-4 flex justify-center px-5">
-          <Button variant="hero" size="lg" onClick={() => setCartOpen(true)}>
-            <ShoppingBag className="h-5 w-5" /> Ver carrito ({count}) · {fmt(cartTotal(cart))}
-          </Button>
-        </div>
-      )}
-      <WhatsAppFab whatsapp={store.whatsapp} text={`Hola, vi tu tienda ${store.name} y tengo una pregunta.`} />
-      <CartSheet open={cartOpen} onOpenChange={setCartOpen} cart={cart} setCart={setCart} storeName={store.name} whatsapp={store.whatsapp} minOrder={minOrder} />
-    </div>
+            );
+          })}
+        </main>
+
+        {/* Barra inferior tipo aplicación (celular) */}
+        <nav aria-label="Navegación de la tienda" className="fixed inset-x-0 bottom-0 z-40 border-t bg-background/95 pb-[env(safe-area-inset-bottom)] backdrop-blur md:hidden">
+          <div className="mx-auto grid max-w-md grid-cols-4">
+            <TabButton icon={Home} label="Inicio" onClick={goHome} />
+            <TabButton icon={Search} label="Buscar" onClick={goSearch} />
+            <a href={`https://wa.me/${whatsappDigits(store.whatsapp)}?text=${encodeURIComponent(`Hola, vi tu tienda ${store.name} y tengo una pregunta.`)}`} target="_blank" rel="noreferrer" className={tabClass}>
+              <MessageCircle className="h-6 w-6" />
+              Escríbenos
+            </a>
+            <TabButton icon={ShoppingBag} label="Carrito" badge={count} onClick={() => setCartOpen(true)} />
+          </div>
+        </nav>
+
+        <WhatsAppFab whatsapp={store.whatsapp} text={`Hola, vi tu tienda ${store.name} y tengo una pregunta.`} className="bottom-4 max-md:hidden" />
+        <CartSheet open={cartOpen} onOpenChange={setCartOpen} cart={cart} setCart={setCart} storeName={store.name} whatsapp={store.whatsapp} minOrder={minOrder} />
+      </div>
     </StoreProviders>
   );
 }
@@ -416,34 +482,11 @@ function ProductView({
               )}
             </div>
 
-            {options.map((o) => {
-              const isColor = /^colou?res?$/i.test(o.name.trim()) && o.values.every((v) => swatchColor(v.label));
-              const current = o.values[picks[o.name] ?? 0];
-              return (
-                <div key={o.name} className="mt-6">
-                  <p className="mb-2 text-sm">
-                    {o.name} <span className="font-semibold">{current?.label}</span>
-                    {current && Number(current.price) ? <span className="text-muted-foreground"> (+{fmt(Number(current.price))})</span> : null}
-                  </p>
-                  <div className="flex flex-wrap gap-2">
-                    {o.values.map((v, i) => {
-                      const active = picks[o.name] === i;
-                      return isColor ? (
-                        <button key={v.label} type="button" aria-label={v.label} title={v.label} onClick={() => setPicks({ ...picks, [o.name]: i })}
-                          className={`h-9 w-9 rounded-full border-2 p-0.5 ${active ? "border-foreground" : "border-border"}`}>
-                          <span className="block h-full w-full rounded-full border border-black/10" style={{ backgroundColor: swatchColor(v.label) }} />
-                        </button>
-                      ) : (
-                        <button key={v.label} type="button" onClick={() => setPicks({ ...picks, [o.name]: i })}
-                          className={`min-h-10 min-w-11 rounded-md border px-3 text-sm font-medium ${active ? "border-transparent bg-primary text-primary-foreground" : "border-border bg-card hover:border-foreground"}`}>
-                          {v.label}
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-              );
-            })}
+            {options.map((o) => (
+              <div key={o.name} className="mt-6">
+                <OptionPicker option={o} value={picks[o.name] ?? 0} onChange={(i) => setPicks({ ...picks, [o.name]: i })} fmt={fmt} />
+              </div>
+            ))}
 
             {extra && (
               <label className="mt-6 flex cursor-pointer items-center gap-3 rounded-xl border bg-card p-3">

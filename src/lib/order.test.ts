@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { buildOrderMessage, cartTotal, whatsappDigits, type CartItem } from "./order";
+import { buildOrderMessage, cartTotal, money, whatsappDigits, type CartItem } from "./order";
 
 const item: CartItem = {
   key: "a",
@@ -30,5 +30,14 @@ describe("pedido", () => {
   });
   it("deja intacto un número ya internacional", () => {
     expect(whatsappDigits("+593 99 123 4567")).toBe("593991234567");
+  });
+  it("da formato a la moneda de la tienda", () => {
+    expect(money(12)).toBe("$12.00");
+    expect(money(12, "S/")).toBe("S/ 12.00");
+    expect(money(12, "€")).toBe("€12.00");
+  });
+  it("el mensaje usa la moneda de la tienda", () => {
+    const m = buildOrderMessage("Tienda", [item], { name: "Ana" }, "S/");
+    expect(m).toContain("Total: S/ 24.00");
   });
 });
